@@ -288,3 +288,26 @@ shared_examples 'autorequires jenkins_security_realm resource' do
     expect(req[0].target).to eq resource
   end
 end # autorequires jenkins_security_realm resource
+
+shared_examples 'autorequires jenkins_authorization_strategy resource' do
+  it "should autorequire jenkins_authorization_strategy resource" do
+    required = Puppet::Type.type(:jenkins_authorization_strategy).new(
+      :name => 'test',
+    )
+    resource = described_class.new(
+      :name   => 'test',
+    )
+    if described_class.validproperty?(:ensure)
+      resource[:ensure] = :present
+    end
+
+    catalog = Puppet::Resource::Catalog.new
+    catalog.add_resource required
+    catalog.add_resource resource
+    req = resource.autorequire
+
+    expect(req.size).to eq 1
+    expect(req[0].source).to eq required
+    expect(req[0].target).to eq resource
+  end
+end # autorequires jenkins_authorization_strategy resource
