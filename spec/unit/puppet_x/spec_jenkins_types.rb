@@ -268,21 +268,23 @@ end # autorequires all jenkins_user resources
 
 shared_examples 'autorequires jenkins_security_realm resource' do
   it "should autorequire jenkins_security_realm resource" do
-    realm = Puppet::Type.type(:jenkins_security_realm).new(
+    required = Puppet::Type.type(:jenkins_security_realm).new(
       :name => 'test',
     )
     resource = described_class.new(
       :name   => 'test',
-      :ensure => :present,
     )
+    if described_class.validproperty?(:ensure)
+      resource[:ensure] = :present
+    end
 
     catalog = Puppet::Resource::Catalog.new
-    catalog.add_resource realm
+    catalog.add_resource required
     catalog.add_resource resource
     req = resource.autorequire
 
     expect(req.size).to eq 1
-    expect(req[0].source).to eq realm
+    expect(req[0].source).to eq required
     expect(req[0].target).to eq resource
   end
 end # autorequires jenkins_security_realm resource
