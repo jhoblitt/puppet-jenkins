@@ -6,11 +6,14 @@ Puppet::Type.type(:jenkins_plugin).provide(:cli, :parent => PuppetX::Jenkins::Pr
   mk_resource_methods
 
   def self.instances(catalog = nil)
-    all = list_plugins(catalog)
+    #all = list_plugins(catalog)
+    all = installed_plugin_info(catalog)
 
-    Puppet.debug("#{sname} instances: #{all.collect {|i| i[:name]}}")
+    Puppet.debug("#{all.class}")
+    Puppet.debug("#{all.size}")
+    Puppet.debug("#{sname} instances: #{all.keys}")
 
-    all.collect {|info| from_hash(info) }
+    all.collect {|name, info| from_hash(info) }
   end
 
   # read-only properties
@@ -35,16 +38,33 @@ Puppet::Type.type(:jenkins_plugin).provide(:cli, :parent => PuppetX::Jenkins::Pr
 
   private
 
+  #def self.from_hash(info)
+  #  # map nil -> :undef
+  #  info = PuppetX::Jenkins::Util.undefize(info)
+
+  #  new({
+  #    :name             => info[:name],
+  #    :ensure           => :present,
+  #    :description      => info[:description],
+  #    :version          => info[:version],
+  #    :update_version   => info[:update_version],
+  #  })
+  #end
+
   def self.from_hash(info)
     # map nil -> :undef
     info = PuppetX::Jenkins::Util.undefize(info)
 
+    update_version = nil
+    if info.has_key?('updateInfo')
+      update_version = info['updateInfo']['version']
+    end
     new({
-      :name             => info[:name],
-      :ensure           => :present,
-      :description      => info[:description],
-      :version          => info[:version],
-      :update_version   => info[:update_version],
+      :name           => info['shortName'],
+      :ensure         => :present,
+      :description    => info['longName'],
+      :version        => info['version'],
+      :update_version => update_version,
     })
   end
   private_class_method :from_hash
@@ -74,6 +94,17 @@ Puppet::Type.type(:jenkins_plugin).provide(:cli, :parent => PuppetX::Jenkins::Pr
     end
   end
   private_class_method :list_plugins
+
+  def self.installed_plugin_info(catalog = nil)
+    raw = clihelper(['installed_plugin_info'], :catalog => catalog)
+
+    begin
+      JSON.parse(raw)
+    rescue JSON::ParserError
+      fail("unable to parse as JSON: #{raw}")
+    end
+  end
+  private_class_method :installed_plugin_info
 
   def install_plugin
     def absent_to_false(x)
