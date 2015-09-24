@@ -36,6 +36,37 @@ shared_examples 'generic ensurable' do
   end
 end # generic ensurable
 
+shared_examples 'validated property' do |param, default, allowed|
+  context 'attrtype' do
+    it { expect(described_class.attrtype(param)).to eq :property }
+  end
+
+  allowed.each do |value|
+    it "should support #{value} as a value" do
+      expect { described_class.new(:name => 'nobody', param => value) }.
+        to_not raise_error
+    end
+  end
+
+  if default.nil?
+    it "should have no default value" do
+      resource = described_class.new(:name => 'nobody')
+      expect(resource.should(param)).to be_nil
+    end
+  else
+    it "should default to #{default}" do
+      resource = described_class.new(:name => 'nobody')
+      expect(resource.should(param)).to eq default
+    end
+  end
+
+  it "should reject unknown values" do
+    expect { described_class.new(:name => 'nobody',
+                                 param => :foo) }.
+      to raise_error(Puppet::Error)
+  end
+end # validated property
+
 shared_examples 'autorequires cli resources' do
   before(:each) { Facter.clear }
 
