@@ -66,6 +66,16 @@ class Util {
     )
   }
 
+  def findCredentialsById(String id, Domain domain=Domain.global()) {
+    def idMatcher = CredentialsMatchers.withId(id)
+    def credStore = Jenkins.getInstance().getExtensionList(
+      'com.cloudbees.plugins.credentials.SystemCredentialsProvider'
+    )[0].getStore()
+    def allCreds = credStore.getCredentials(domain)
+
+    return CredentialsMatchers.firstOrNull(allCreds, idMatcher)
+  }
+
   def userToMap(User user) {
     def conf = [:]
 
@@ -426,7 +436,7 @@ class Actions {
   void credentials_list_json() {
     def instance = Jenkins.getInstance()
 
-    def credentials_store = Jenkins.instance.getExtensionList(
+    def credentialsStore = instance.getExtensionList(
       'com.cloudbees.plugins.credentials.SystemCredentialsProvider'
     )[0].getStore()
 
@@ -437,22 +447,21 @@ class Actions {
     // BaseCredentials objects do not appear to know what domain they are part
     // of so we need to keep track of which domain a credentials was retrieved
     // from.
-    def allCreds = credentials_store.getCredentials(domain)
+    def allCreds = credentialsStore.getCredentials(domain)
 
     def allInfo = []
 
     // note that id is theoretically unique for a credential across all domains
     allCreds.each { cred ->
       def info = [
-        id:          cred.id,
-        domain:      domain.getName(),
-        scope:       cred.scope,
-        class:       cred.class.getSimpleName(),
+        id:     cred.id,
+        domain: domain.getName(),
+        scope:  cred.scope,
+        impl:  cred.class.getSimpleName(),
       ]
 
       switch (cred) {
-        //case com.cloudbees.plugins.credentials.impl.UsernamePasswordCredentialsImpl:
-        case UsernamePasswordCredentialsImpl:
+        case com.cloudbees.plugins.credentials.impl.UsernamePasswordCredentialsImpl:
           info['description'] = cred.description
           info['username'] = cred.username
           info['password'] = cred.password.plainText
@@ -472,13 +481,25 @@ class Actions {
           info['content'] = IOUtils.toString(cred.getContent(), "UTF-8")
           break
         case com.cloudbees.plugins.credentials.impl.CertificateCredentialsImpl:
+          def keyStoreSource = cred.getKeyStoreSource()
+
           info['description'] = cred.description
           info['password'] = cred.password.plainText
           info['password_empty'] = cred.passwordEmpty
+          info['key_store_impl'] = keyStoreSource.class.getSimpleName()
 
+          switch (keyStoreSource) {
+            case com.cloudbees.plugins.credentials.impl.CertificateCredentialsImpl$UploadedKeyStoreSource:
+              info['content'] = IOUtils.toString(keyStoreSource.getKeyStoreBytes(), "UTF-8")
+              break
+            case com.cloudbees.plugins.credentials.impl.CertificateCredentialsImpl$FileOnMasterKeyStoreSource:
+              info['source'] = keyStoreSource.getKeyStoreFile()
+              break
+            default:
+              throw new UnsupportedCredentialsClass("unsupported " + keyStoreSource)
+          }
           break
         default:
-          //throw new UnsupportedCredentialsClass("unsupported " + cred.getClass().toString())
           throw new UnsupportedCredentialsClass("unsupported " + cred)
       }
 
