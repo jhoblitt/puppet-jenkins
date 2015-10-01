@@ -845,6 +845,79 @@ class Actions {
      j.setSlaveAgentPort(n.toInteger())
      j.save()
   }
+
+  /////////////////////////
+  // job_enabled
+  /////////////////////////
+  /*
+   * Print the job's state as either "true" or "false"
+  */
+  void job_enabled(String name) {
+    def disabled = Jenkins.getInstance().getJob(name).isDisabled()
+    out.println(!disabled)
+  }
+
+  /////////////////////////
+  // plugin
+  /////////////////////////
+  void installed_plugin_info() {
+    def j = Jenkins.getInstance()
+    def pm = j.getPluginManager()
+
+    // list of hudson.PluginWrapper objects
+    def plugins = pm.getPlugins()
+
+    // hudson.PluginWrapper @Exported methods
+    def infoMethods = [
+      // hudson.PluginWrapper.Dependency objects do not nicely serialize to
+      // JSON
+      // getDependencies:     'dependencies',
+      getShortName:        'shortName',
+      getUrl:              'url',
+      getLongName:         'longName',
+      supportsDynamicLoad: 'supportsDynamicLoad',
+      getVersion:          'version',
+      isActive:            'active',
+      isBundled:           'bundled',
+      isEnabled:           'enabled',
+      hasUpdate:           'hasUpdate',
+      isPinned:            'pinned',
+      isDeleted:           'deleted',
+      isDowngradable:      'downgradable',
+      getBackupVersion:    'backupVersion',
+    ]
+
+    def pluginInfo = [:]
+
+    plugins.each { plugin ->
+      // get the "shortName" aka string for the plugin
+      def shortName = plugin.getShortName()
+
+      def pluginConfig = [:]
+      infoMethods.each { k,v ->
+        pluginConfig[v] = plugin."${k}"()
+      }
+
+      if (plugin.isPinned()) {
+        pluginConfig['pinningForcingOldVersion'] = plugin.isPinningForcingOldVersion()
+      }
+
+      if (plugin.hasUpdate()) {
+        def updateInfo = plugin.getUpdateInfo()
+        pluginConfig['updateInfo'] = [
+          version: updateInfo.version,
+          compatibleWithInstalledVersion: updateInfo.isCompatibleWithInstalledVersion(),
+          url: updateInfo.url,
+          neededDependenciesCompatibleWithInstalledVersion: updateInfo.isNeededDependenciesCompatibleWithInstalledVersion(),
+        ]
+      }
+
+      pluginInfo[shortName] = pluginConfig
+    }
+
+    def builder = new groovy.json.JsonBuilder(pluginInfo)
+    out.println(builder.toPrettyString())
+  }
 } // class Actions
 
 ///////////////////////////////////////////////////////////////////////////////
